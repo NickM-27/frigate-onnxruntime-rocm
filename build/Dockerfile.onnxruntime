@@ -1,8 +1,11 @@
-FROM rocm/dev-ubuntu-22.04:7.2.3-complete AS py311-wheels
+FROM rocm/dev-ubuntu-22.04:7.2.3-complete AS py313-wheels
 
-# Install Python 3.11 and build dependencies
+# Install Python 3.13 (via deadsnakes PPA) and build dependencies
 RUN apt-get update && \
-    apt-get install -y python3.11 python3.11-dev python3.11-distutils git wget build-essential && \
+    apt-get install -y software-properties-common && \
+    add-apt-repository -y ppa:deadsnakes/ppa && \
+    apt-get update && \
+    apt-get install -y python3.13 python3.13-dev python3.13-venv git wget build-essential && \
     apt-get install -y rocm-dev rocm-libs migraphx && \
     rm -rf /var/lib/apt/lists/*
 
@@ -24,13 +27,13 @@ RUN wget https://github.com/Kitware/CMake/releases/download/v$CMAKE/cmake-$CMAKE
 # Set PATH permanently so CMake is available in subsequent RUN commands
 ENV PATH="/opt/cmake-$CMAKE-linux-x86_64/bin:$PATH"
 
-# Install pip for Python 3.11
+# Install pip for Python 3.13
 RUN wget -q https://bootstrap.pypa.io/get-pip.py -O get-pip.py && \
-    python3.11 get-pip.py "pip" && \
+    python3.13 get-pip.py "pip" && \
     rm get-pip.py
 
-# Install build dependencies
-RUN pip install numpy packaging protobuf
+# Install build dependencies (setuptools/wheel needed since distutils was removed in 3.12+)
+RUN python3.13 -m pip install setuptools wheel numpy packaging protobuf
 
 # Create ROCm version file that ONNX Runtime expects
 RUN mkdir -p /opt/rocm/.info && \
@@ -43,7 +46,7 @@ RUN git clone --single-branch --branch v1.24.4 --recursive https://github.com/Mi
 WORKDIR /onnxruntime
 
 # Configure and build ONNX Runtime with MIGraphX (single step with all flags)
-RUN python3.11 tools/ci_build/build.py \
+RUN python3.13 tools/ci_build/build.py \
     --build_dir build/Linux \
     --allow_running_as_root \
     --config Release \
@@ -66,4 +69,4 @@ RUN mkdir -p /out && \
     cp build/Linux/Release/dist/*.whl /out/
 
 FROM scratch AS export-stage
-COPY --from=py311-wheels /out /out
+COPY --from=py313-wheels /out /out
