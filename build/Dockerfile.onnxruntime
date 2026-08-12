@@ -36,8 +36,11 @@ RUN wget -q https://bootstrap.pypa.io/get-pip.py -O get-pip.py && \
     python3.13 get-pip.py "pip" && \
     rm get-pip.py
 
-# Install build dependencies (setuptools/wheel needed since distutils was removed in 3.12+)
-RUN python3.13 -m pip install setuptools wheel numpy packaging protobuf
+# Install build dependencies. --ignore-installed forces a modern setuptools into
+# /usr/local (which precedes it on sys.path); otherwise pip skips it in favor of
+# Ubuntu's old system setuptools, which still imports distutils (removed in 3.12+).
+RUN python3.13 -m pip install --upgrade --ignore-installed setuptools wheel && \
+    python3.13 -m pip install numpy packaging protobuf
 
 # Create ROCm version file that ONNX Runtime expects
 RUN mkdir -p /opt/rocm/.info && \
